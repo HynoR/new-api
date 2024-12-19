@@ -6,44 +6,6 @@ import (
 	"sync"
 )
 
-// from songquanpeng/one-api
-const (
-	USD2RMB = 7.3 // 暂定 1 USD = 7.3 RMB
-	USD     = 500 // $0.002 = 1 -> $1 = 500
-	RMB     = USD / USD2RMB
-)
-
-// modelRatio
-// https://platform.openai.com/docs/models/model-endpoint-compatibility
-// https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Blfmc9dlf
-// https://openai.com/pricing
-// TODO: when a new api is enabled, check the pricing here
-// 1 === $0.002 / 1K tokens
-// 1 === ￥0.014 / 1k tokens
-
-var defaultModelPrice = map[string]float64{
-	"suno_music":        0.1,
-	"suno_lyrics":       0.01,
-	"dall-e-3":          0.04,
-	"gpt-4-gizmo-*":     0.1,
-	"mj_imagine":        0.1,
-	"mj_variation":      0.1,
-	"mj_reroll":         0.1,
-	"mj_blend":          0.1,
-	"mj_modal":          0.1,
-	"mj_zoom":           0.1,
-	"mj_shorten":        0.1,
-	"mj_high_variation": 0.1,
-	"mj_low_variation":  0.1,
-	"mj_pan":            0.1,
-	"mj_inpaint":        0,
-	"mj_custom_zoom":    0,
-	"mj_describe":       0.05,
-	"mj_upscale":        0.05,
-	"swap_face":         0.05,
-	"mj_upload":         0.05,
-}
-
 var (
 	modelPriceMap      map[string]float64 = nil
 	modelPriceMapMutex                    = sync.RWMutex{}
@@ -59,7 +21,6 @@ var defaultCompletionRatio = map[string]float64{
 	"gpt-4o-gizmo-*": 3,
 	"gpt-4-all":      2,
 }
-var defaultModelRatio = initModelRatio()
 
 func GetModelPriceMap() map[string]float64 {
 	modelPriceMapMutex.Lock()
