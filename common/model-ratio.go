@@ -171,62 +171,6 @@ func UpdateCompletionRatioByJSONString(jsonStr string) error {
 	return json.Unmarshal([]byte(jsonStr), &CompletionRatio)
 }
 
-var OpenAICompletionRatioDataDiff = map[string]float64{
-	"gpt-4o-2024-05-13":  3, // 第一版4o 为 3倍
-	"chatgpt-4o-latest":  3,
-	"gpt-3.5-turbo-0125": 3, // 最后一版3.5 turbo 为 3倍
-	"gpt-3.5-turbo-1106": 2, // 1106 为 2倍
-}
-
-func getOpenAICompletionRatioData(name string) float64 {
-	// 特殊倍率
-	if v, ok := OpenAICompletionRatioDataDiff[name]; ok {
-		return v
-	}
-
-	if strings.HasPrefix(name, "gpt-4-gizmo") {
-		name = "gpt-4-gizmo-*"
-	}
-	if strings.HasPrefix(name, "gpt-4o-gizmo") {
-		name = "gpt-4o-gizmo-*"
-	}
-
-	// 逆向大手子
-	if strings.HasSuffix(name, "-all") || strings.HasSuffix(name, "-gizmo-*") {
-		return 1
-	}
-
-	// 4o 大家族基本上为4倍 , 05-13和chatgpt-4o-latest为3倍
-	if strings.HasPrefix(name, "gpt-4o") {
-		return 4
-	}
-
-	// o1
-	if strings.HasPrefix(name, "o1-") {
-		return 4
-	}
-
-	// gpt-4 / gpt-4-turbo 大家族基本上为2倍 带preview的为3倍, turbo为3倍
-	if strings.HasPrefix(name, "gpt-4") {
-		if strings.HasSuffix(name, "-preview") {
-			return 3
-		}
-		if strings.HasSuffix(name, "-turbo") {
-			return 3
-		}
-		return 2
-	}
-
-	// gpt-3.5 老版本均为1.33 (3/4)
-	if strings.HasPrefix(name, "gpt-3.5") {
-		return 3.0 / 4.0
-	}
-
-	// 默认倍率
-	return 1
-
-}
-
 func GetCompletionRatio(name string) float64 {
 	// Custom Completion Ratio
 	if ratio, ok := CompletionRatio[name]; ok && ratio > 0 {
@@ -240,43 +184,39 @@ func GetCompletionRatio(name string) float64 {
 
 	// Anthropic Models
 	if strings.Contains(name, "claude-3") {
+		// V3 v3.5 均为5倍
 		return 5
 	}
-
 	if strings.Contains(name, "claude-2") || strings.Contains(name, "claude-instant-1") {
+		// V1 V2 为3倍
 		return 3
 	}
 
+	// Mistral Models
 	if strings.HasPrefix(name, "mistral-") {
 		return 3
 	}
+
+	// Google Models
 	if strings.HasPrefix(name, "gemini-") {
 		return 4
 	}
+
+	// Cohere Models
 	if strings.HasPrefix(name, "command") {
-		switch name {
-		// 淘汰模型暂不考虑倍率设置
-		case "command-r":
-			return 3
-		case "command-r-plus":
-			return 5
-		// 2024 后推出的新模型目前都是4倍
-		default:
-			return 4
-		}
+		return getCohereCompletionRatioData(name)
 	}
+
+	// Deepseek Models
 	if strings.HasPrefix(name, "deepseek") {
 		return 2
 	}
-	if strings.HasPrefix(name, "ERNIE-Speed-") {
-		return 2
-	} else if strings.HasPrefix(name, "ERNIE-Lite-") {
-		return 2
-	} else if strings.HasPrefix(name, "ERNIE-Character") {
-		return 2
-	} else if strings.HasPrefix(name, "ERNIE-Functions") {
-		return 2
+
+	// ERNIE Models
+	if strings.HasPrefix(name, "ERNIE-") {
+		return getERNIECompletionRatioData(name)
 	}
+
 	switch name {
 	case "llama2-70b-4096":
 		return 0.8 / 0.64
