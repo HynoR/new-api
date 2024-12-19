@@ -2,7 +2,9 @@ package common
 
 import "strings"
 
-// OpenAICompletionRatioDataDiff 变化过于离谱的倍率
+// 存放变化过于离谱的倍率算法的模块
+
+// OpenAICompletionRatioDataDiff
 var openAICompletionRatioDataDiff = map[string]float64{
 	"gpt-4o-2024-05-13":  3, // 第一版4o 为 3倍
 	"chatgpt-4o-latest":  3,
