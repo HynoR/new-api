@@ -102,6 +102,14 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 				FunctionDeclarations: textRequest.Functions,
 			},
 		}
+	} else {
+		// 如果模型后带有-search
+		if strings.HasSuffix(textRequest.Model, "-search") {
+			geminiRequest.Tools = append(geminiRequest.Tools, GeminiChatTool{
+				GoogleSearch: make(map[string]string),
+			})
+			textRequest.Model = strings.TrimPrefix(textRequest.Model, "-search")
+		}
 	}
 
 	if textRequest.ResponseFormat != nil && (textRequest.ResponseFormat.Type == "json_schema" || textRequest.ResponseFormat.Type == "json_object") {
