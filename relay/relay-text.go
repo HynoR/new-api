@@ -454,6 +454,16 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 
 		quotaCalculateDecimal = promptQuota.Add(completionQuota).Mul(ratio)
 
+		// Gemini 2.5 Pro 模型的额外计费
+		isGemini2_5ExtraPricing := strings.HasPrefix(modelName, "gemini-2.5-pro") && promptTokens > 200*1000
+
+		// 如果是Gemini 2.5 Pro 模型 > 200k 的额外计费 , quota计算*2,completionQuota*0.75
+		if isGemini2_5ExtraPricing {
+			quotaCalculateDecimal = quotaCalculateDecimal.Mul(decimal.NewFromInt(2))
+			completionQuota = completionQuota.Mul(decimal.NewFromFloat(0.75))
+			extraContent += "Gemini 2.5 Pro over 200k pricing applied"
+		}
+
 		if !ratio.IsZero() && quotaCalculateDecimal.LessThanOrEqual(decimal.Zero) {
 			quotaCalculateDecimal = decimal.NewFromInt(1)
 		}
