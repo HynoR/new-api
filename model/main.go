@@ -182,6 +182,7 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 		}
 		return gorm.Open(mysql.Open(dsn), &gorm.Config{
 			PrepareStmt: true, // precompile SQL
+			// For Gorm NewVersion:	DisableForeignKeyConstraintWhenMigrating: true,  Disable FK constraints during migration
 		})
 	}
 	// Use SQLite
