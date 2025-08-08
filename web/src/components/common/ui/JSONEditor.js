@@ -192,9 +192,15 @@ const JSONEditor = ({
     handleVisualChange(newData);
   }, [jsonData, handleVisualChange]);
 
+  // 检测重复键
+  const isDuplicateKey = useCallback((key, currentIndex, entries) => {
+    return entries.some(([k], index) => k === key && index !== currentIndex);
+  }, []);
+
   // 更新键名
   const updateKey = useCallback((oldKey, newKey) => {
     if (oldKey === newKey || !newKey) return;
+    
     const newData = {};
     Object.entries(jsonData).forEach(([k, v]) => {
       if (k === oldKey) {
@@ -259,29 +265,48 @@ const JSONEditor = ({
           </div>
         )}
 
-        {entries.map(([key, value], index) => (
-          <Row key={index} gutter={8} align="middle">
-            <Col span={6}>
-              <Input
-                placeholder={t('键名')}
-                value={key}
-                onChange={(newKey) => updateKey(key, newKey)}
-              />
-            </Col>
-            <Col span={16}>
-              {renderValueInput(key, value)}
-            </Col>
-            <Col span={2}>
-              <Button
-                icon={<IconDelete />}
-                type="danger"
-                theme="borderless"
-                onClick={() => removeKeyValue(key)}
-                style={{ width: '100%' }}
-              />
-            </Col>
-          </Row>
-        ))}
+        {entries.map(([key, value], index) => {
+          const isDuplicate = isDuplicateKey(key, index, entries);
+          return (
+            <div key={index}>
+              <Row gutter={8} align="middle">
+                <Col span={6}>
+                  <Input
+                    placeholder={t('键名')}
+                    value={key}
+                    onChange={(newKey) => updateKey(key, newKey)}
+                    onBlur={() => {
+                      // 失焦时如果存在重复键，删除当前行
+                      if (isDuplicate) {
+                        removeKeyValue(key);
+                      }
+                    }}
+                    status={isDuplicate ? 'error' : undefined}
+                  />
+                </Col>
+                <Col span={16}>
+                  {renderValueInput(key, value)}
+                </Col>
+                <Col span={2}>
+                  <Button
+                    icon={<IconDelete />}
+                    type="danger"
+                    theme="borderless"
+                    onClick={() => removeKeyValue(key)}
+                    style={{ width: '100%' }}
+                  />
+                </Col>
+              </Row>
+              {isDuplicate && (
+                <div className="mt-1">
+                  <Text type="danger" size="small">
+                    {t('键名重复，失焦时将自动删除此行')}
+                  </Text>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         <div className="mt-2 flex justify-center">
           <Button
@@ -371,22 +396,36 @@ const JSONEditor = ({
             </Text>
           )}
 
-          {entries.map(([nestedKey, nestedValue], index) => (
-            <Row key={index} gutter={4} align="middle" className="mb-1">
-              <Col span={8}>
-                <Input
-                  size="small"
-                  placeholder={t('键名')}
-                  value={nestedKey}
-                  onChange={(newKey) => {
-                    const newData = { ...jsonData };
-                    const oldValue = newData[key][nestedKey];
-                    delete newData[key][nestedKey];
-                    newData[key][newKey] = oldValue;
-                    handleVisualChange(newData);
-                  }}
-                />
-              </Col>
+          {entries.map(([nestedKey, nestedValue], index) => {
+            const isNestedDuplicate = isDuplicateKey(nestedKey, index, entries);
+            return (
+              <div key={index}>
+                <Row gutter={4} align="middle" className="mb-1">
+                  <Col span={8}>
+                    <Input
+                      size="small"
+                      placeholder={t('键名')}
+                      value={nestedKey}
+                      onChange={(newKey) => {
+                        if (newKey && newKey !== nestedKey) {
+                          const newData = { ...jsonData };
+                          const oldValue = newData[key][nestedKey];
+                          delete newData[key][nestedKey];
+                          newData[key][newKey] = oldValue;
+                          handleVisualChange(newData);
+                        }
+                      }}
+                      onBlur={() => {
+                        // 失焦时如果存在重复键，删除当前行
+                        if (isNestedDuplicate) {
+                          const newData = { ...jsonData };
+                          delete newData[key][nestedKey];
+                          handleVisualChange(newData);
+                        }
+                      }}
+                      status={isNestedDuplicate ? 'error' : undefined}
+                    />
+                  </Col>
               <Col span={14}>
                 {typeof nestedValue === 'object' && nestedValue !== null ? (
                   <TextArea
@@ -437,8 +476,17 @@ const JSONEditor = ({
                   style={{ width: '100%' }}
                 />
               </Col>
-            </Row>
-          ))}
+                </Row>
+                {isNestedDuplicate && (
+                  <div className="mt-1 ml-1">
+                    <Text type="danger" size="small">
+                      {t('键名重复，失焦时将自动删除此行')}
+                    </Text>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <div className="flex justify-center mt-1 gap-2">
             <Button
