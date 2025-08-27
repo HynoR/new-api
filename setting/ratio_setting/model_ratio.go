@@ -326,6 +326,9 @@ func InitRatioSettings() {
 	imageRatioMap = defaultImageRatio
 	imageRatioMapMutex.Unlock()
 
+	// initialize thresholdRatioMap
+	InitThresholdRatio()
+
 }
 
 func GetModelPriceMap() map[string]float64 {

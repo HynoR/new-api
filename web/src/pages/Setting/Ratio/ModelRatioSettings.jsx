@@ -44,6 +44,7 @@ export default function ModelRatioSettings(props) {
     ModelRatio: '',
     CacheRatio: '',
     CompletionRatio: '',
+    ThresholdRatio: '',
     ExposeRatioEnabled: false,
   });
   const refForm = useRef();
@@ -221,6 +222,30 @@ export default function ModelRatioSettings(props) {
               ]}
               onChange={(value) =>
                 setInputs({ ...inputs, CompletionRatio: value })
+              }
+            />
+          </Col>
+        </Row>
+        <Row gutter={16}>
+          <Col xs={24} sm={16}>
+            <Form.TextArea
+              label={t('阈值计费配置')}
+              extraText={t('基于token阈值的分级计费，当输入token超过阈值时使用长上下文价格')}
+              placeholder={t(
+                '为一个 JSON 文本，配置格式：{"model_name": {"ModelName": "model_name", "Threshold": 200000, "InputRatio": 10.0, "OutputRatio": 30.0, "Enabled": true}}'
+              )}
+              field={'ThresholdRatio'}
+              autosize={{ minRows: 6, maxRows: 12 }}
+              trigger='blur'
+              stopValidateWithError
+              rules={[
+                {
+                  validator: (rule, value) => verifyJSON(value),
+                  message: '不是合法的 JSON 字符串',
+                },
+              ]}
+              onChange={(value) =>
+                setInputs({ ...inputs, ThresholdRatio: value })
               }
             />
           </Col>

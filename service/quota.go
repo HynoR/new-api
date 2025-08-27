@@ -265,7 +265,26 @@ func PostClaudeConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, 
 	}
 
 	calculateQuota := 0.0
-	if !relayInfo.PriceData.UsePrice {
+	
+	// Check if model has threshold configuration and input tokens exceed threshold
+	if config, exists := ratio_setting.GetThresholdConfig(modelName); exists && config.Enabled {
+		if promptTokens >= config.Threshold {
+			// Use long context pricing for entire request
+			calculateQuota = float64(promptTokens)*config.InputRatio + float64(completionTokens)*config.OutputRatio
+			// Still apply cache ratios if present
+			calculateQuota += float64(cacheTokens) * cacheRatio * config.InputRatio
+			calculateQuota += float64(cacheCreationTokens) * cacheCreationRatio * config.InputRatio
+			calculateQuota = calculateQuota * groupRatio
+		} else {
+			// Use normal pricing
+			calculateQuota = float64(promptTokens)
+			calculateQuota += float64(cacheTokens) * cacheRatio
+			calculateQuota += float64(cacheCreationTokens) * cacheCreationRatio
+			calculateQuota += float64(completionTokens) * completionRatio
+			calculateQuota = calculateQuota * groupRatio * modelRatio
+		}
+	} else if !relayInfo.PriceData.UsePrice {
+		// Original logic for non-threshold models
 		calculateQuota = float64(promptTokens)
 		calculateQuota += float64(cacheTokens) * cacheRatio
 		calculateQuota += float64(cacheCreationTokens) * cacheCreationRatio
