@@ -7,20 +7,16 @@ import (
 )
 
 type ThresholdConfig struct {
-	ModelName   string  `json:"model_name"`
-	Threshold   int     `json:"threshold"`
-	InputRatio  float64 `json:"input_ratio"`
-	OutputRatio float64 `json:"output_ratio"`
-	Enabled     bool    `json:"enabled"`
+	Threshold       int     `json:"threshold"`
+	ModelRatio      float64 `json:"model_ratio"`
+	CompletionRatio float64 `json:"completion_ratio"`
 }
 
 var defaultThresholdRatio = map[string]ThresholdConfig{
 	"claude-sonnet-4": {
-		ModelName:   "claude-sonnet-4",
-		Threshold:   200000,
-		InputRatio:  10.0, // $10/1M input tokens
-		OutputRatio: 30.0, // $30/1M output tokens
-		Enabled:     true,
+		Threshold:       200000,
+		ModelRatio:      10.0, // $10/1M input tokens
+		CompletionRatio: 30.0, // $30/1M output tokens
 	},
 }
 
@@ -61,9 +57,9 @@ func UpdateThresholdRatioByJSONString(jsonStr string) error {
 func GetThresholdConfig(name string) (ThresholdConfig, bool) {
 	thresholdRatioMapMutex.RLock()
 	defer thresholdRatioMapMutex.RUnlock()
-	
+
 	name = FormatMatchingModelName(name)
-	
+
 	config, ok := thresholdRatioMap[name]
 	if !ok {
 		return ThresholdConfig{}, false
