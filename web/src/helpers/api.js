@@ -108,25 +108,6 @@ API.interceptors.response.use(
 
 // playground
 
-const normalizeMaxTokens = (value) => {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed === '') {
-      return null;
-    }
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) && parsed >= 0
-      ? Math.floor(parsed)
-      : null;
-  }
-
-  return null;
-};
-
 // 构建API请求负载
 export const buildApiPayload = (
   messages,
@@ -174,9 +155,8 @@ export const buildApiPayload = (
     }
 
     if (param === 'max_tokens') {
-      const normalized = normalizeMaxTokens(value);
-      if (normalized !== null) {
-        payload[param] = normalized;
+      if (typeof value === 'number') {
+        payload[param] = value;
       }
       return;
     }

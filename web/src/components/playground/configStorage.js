@@ -21,27 +21,9 @@ import {
   STORAGE_KEYS,
   DEFAULT_CONFIG,
 } from '../../constants/playground.constants';
+import { sanitizePlaygroundInputs } from '../../helpers/playgroundMaxTokens';
 
 const MESSAGES_STORAGE_KEY = 'playground_messages';
-
-const normalizeMaxTokens = (value) => {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed === '') {
-      return null;
-    }
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) && parsed >= 0
-      ? Math.floor(parsed)
-      : null;
-  }
-
-  return null;
-};
 
 /**
  * 保存配置到 localStorage
@@ -86,10 +68,10 @@ export const loadConfig = () => {
       const parsedConfig = JSON.parse(savedConfig);
 
       const mergedConfig = {
-        inputs: {
+        inputs: sanitizePlaygroundInputs({
           ...DEFAULT_CONFIG.inputs,
           ...parsedConfig.inputs,
-        },
+        }),
         parameterEnabled: {
           ...DEFAULT_CONFIG.parameterEnabled,
           ...parsedConfig.parameterEnabled,
@@ -101,10 +83,6 @@ export const loadConfig = () => {
         customRequestBody:
           parsedConfig.customRequestBody || DEFAULT_CONFIG.customRequestBody,
       };
-
-      mergedConfig.inputs.max_tokens = normalizeMaxTokens(
-        mergedConfig.inputs.max_tokens,
-      );
 
       return mergedConfig;
     }
