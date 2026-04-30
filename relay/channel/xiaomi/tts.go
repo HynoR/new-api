@@ -13,8 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Request shapes.
-
 type xiaomiTTSMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -31,8 +29,6 @@ type xiaomiTTSRequest struct {
 	Audio    xiaomiTTSAudio     `json:"audio"`
 }
 
-// Response shape.
-
 type xiaomiTTSResponse struct {
 	Choices []struct {
 		Message struct {
@@ -43,8 +39,6 @@ type xiaomiTTSResponse struct {
 	} `json:"choices"`
 	Usage dto.Usage `json:"usage"`
 }
-
-// Format helpers.
 
 func normalizeMimoAudioFormat(format string) string {
 	switch format {
@@ -68,12 +62,7 @@ func getTTSContentType(format string) string {
 	}
 }
 
-// handleTTSResponse extracts the base64 audio payload from MiMo's chat-completion
-// shaped response and writes the raw bytes back to the OpenAI TTS-compatible
-// client. Xiaomi TTS is in a free experimental phase, so usage is passed through
-// verbatim and any non-2xx upstream response is surfaced earlier by the relay
-// framework before reaching this handler.
-func handleTTSResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, audioFormat string) (any, *types.NewAPIError) {
+func handleTTSResponse(c *gin.Context, resp *http.Response, _ *relaycommon.RelayInfo, audioFormat string) (any, *types.NewAPIError) {
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -112,12 +101,5 @@ func handleTTSResponse(c *gin.Context, resp *http.Response, info *relaycommon.Re
 
 	c.Data(http.StatusOK, getTTSContentType(audioFormat), audioData)
 
-	usage := ttsResp.Usage
-	if usage.PromptTokens == 0 {
-		usage.PromptTokens = info.GetEstimatePromptTokens()
-	}
-	if usage.TotalTokens == 0 {
-		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
-	}
-	return &usage, nil
+	return &ttsResp.Usage, nil
 }
