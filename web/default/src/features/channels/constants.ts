@@ -58,6 +58,7 @@ export const CHANNEL_TYPES = {
   55: 'Sora',
   56: 'Replicate',
   57: 'Codex',
+  58: 'Xiaomi',
 } as const
 
 export const CHANNEL_TYPE_OPTIONS = Object.entries(CHANNEL_TYPES)

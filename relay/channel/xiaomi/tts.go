@@ -13,7 +13,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type mimoTTSResponse struct {
+// Request shapes.
+
+type xiaomiTTSMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type xiaomiTTSAudio struct {
+	Voice  string `json:"voice"`
+	Format string `json:"format"`
+}
+
+type xiaomiTTSRequest struct {
+	Model    string             `json:"model"`
+	Messages []xiaomiTTSMessage `json:"messages"`
+	Audio    xiaomiTTSAudio     `json:"audio"`
+}
+
+// Response shape.
+
+type xiaomiTTSResponse struct {
 	Choices []struct {
 		Message struct {
 			Audio struct {
@@ -24,70 +44,80 @@ type mimoTTSResponse struct {
 	Usage dto.Usage `json:"usage"`
 }
 
+// Format helpers.
+
+func normalizeMimoAudioFormat(format string) string {
+	switch format {
+	case "":
+		return "wav"
+	case "pcm":
+		return "pcm16"
+	default:
+		return format
+	}
+}
+
 func getTTSContentType(format string) string {
 	switch format {
-	case "wav":
-		return "audio/wav"
 	case "mp3":
 		return "audio/mpeg"
 	case "pcm", "pcm16":
 		return "audio/pcm"
-	case "flac":
-		return "audio/flac"
-	case "opus":
-		return "audio/opus"
-	case "aac":
-		return "audio/aac"
 	default:
 		return "audio/wav"
 	}
 }
 
-func handleTTSResponse(c *gin.Context, resp *http.Response, _ *relaycommon.RelayInfo, audioFormat string) (usage any, err *types.NewAPIError) {
+// handleTTSResponse extracts the base64 audio payload from MiMo's chat-completion
+// shaped response and writes the raw bytes back to the OpenAI TTS-compatible
+// client. Xiaomi TTS is in a free experimental phase, so usage is passed through
+// verbatim and any non-2xx upstream response is surfaced earlier by the relay
+// framework before reaching this handler.
+func handleTTSResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, audioFormat string) (any, *types.NewAPIError) {
 	defer resp.Body.Close()
-	body, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, types.NewErrorWithStatusCode(
-			fmt.Errorf("failed to read xiaomi TTS response: %w", readErr),
+			fmt.Errorf("read xiaomi TTS response: %w", err),
 			types.ErrorCodeReadResponseBodyFailed,
 			http.StatusInternalServerError,
 		)
 	}
 
-	var mimoResp mimoTTSResponse
-	if unmarshalErr := common.Unmarshal(body, &mimoResp); unmarshalErr != nil {
+	var ttsResp xiaomiTTSResponse
+	if err := common.Unmarshal(body, &ttsResp); err != nil {
 		return nil, types.NewErrorWithStatusCode(
-			fmt.Errorf("failed to unmarshal xiaomi TTS response: %w", unmarshalErr),
+			fmt.Errorf("unmarshal xiaomi TTS response: %w", err),
 			types.ErrorCodeBadResponseBody,
-			http.StatusInternalServerError,
+			http.StatusBadGateway,
 		)
 	}
 
-	if len(mimoResp.Choices) == 0 || mimoResp.Choices[0].Message.Audio.Data == "" {
+	if len(ttsResp.Choices) == 0 || ttsResp.Choices[0].Message.Audio.Data == "" {
 		return nil, types.NewErrorWithStatusCode(
-			fmt.Errorf("no audio data in xiaomi TTS response"),
+			fmt.Errorf("xiaomi TTS response missing audio data"),
 			types.ErrorCodeBadResponse,
-			http.StatusBadRequest,
+			http.StatusBadGateway,
 		)
 	}
 
-	audioData, decodeErr := base64.StdEncoding.DecodeString(mimoResp.Choices[0].Message.Audio.Data)
-	if decodeErr != nil {
+	audioData, err := base64.StdEncoding.DecodeString(ttsResp.Choices[0].Message.Audio.Data)
+	if err != nil {
 		return nil, types.NewErrorWithStatusCode(
-			fmt.Errorf("failed to decode base64 audio data: %w", decodeErr),
+			fmt.Errorf("decode xiaomi TTS audio payload: %w", err),
 			types.ErrorCodeBadResponse,
-			http.StatusInternalServerError,
+			http.StatusBadGateway,
 		)
 	}
 
-	contentType := getTTSContentType(audioFormat)
-	c.Data(http.StatusOK, contentType, audioData)
+	c.Data(http.StatusOK, getTTSContentType(audioFormat), audioData)
 
-	usage = &dto.Usage{
-		PromptTokens:     mimoResp.Usage.PromptTokens,
-		CompletionTokens: mimoResp.Usage.CompletionTokens,
-		TotalTokens:      mimoResp.Usage.TotalTokens,
+	usage := ttsResp.Usage
+	if usage.PromptTokens == 0 {
+		usage.PromptTokens = info.GetEstimatePromptTokens()
 	}
-
-	return usage, nil
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+	return &usage, nil
 }
