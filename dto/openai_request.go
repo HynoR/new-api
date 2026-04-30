@@ -280,8 +280,8 @@ type Message struct {
 	Audio            json.RawMessage `json:"audio,omitempty"`
 	Name             *string         `json:"name,omitempty"`
 	Prefix           *bool           `json:"prefix,omitempty"`
-	ReasoningContent string          `json:"reasoning_content,omitempty"`
-	Reasoning        string          `json:"reasoning,omitempty"`
+	ReasoningContent *string         `json:"reasoning_content,omitempty"`
+	Reasoning        *string         `json:"reasoning,omitempty"`
 	ToolCalls        json.RawMessage `json:"tool_calls,omitempty"`
 	ToolCallId       string          `json:"tool_call_id,omitempty"`
 	parsedContent    []MediaContent
@@ -431,6 +431,16 @@ const (
 	ContentTypeVideoUrl   = "video_url" // 阿里百炼视频识别
 	//ContentTypeAudioUrl   = "audio_url"
 )
+
+func (m *Message) GetReasoningContent() string {
+	if m.ReasoningContent == nil && m.Reasoning == nil {
+		return ""
+	}
+	if m.ReasoningContent != nil {
+		return *m.ReasoningContent
+	}
+	return *m.Reasoning
+}
 
 func (m *Message) GetPrefix() bool {
 	if m.Prefix == nil {

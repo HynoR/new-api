@@ -1,7 +1,10 @@
-import { useState, useCallback, lazy, Suspense } from 'react'
-import { getRouteApi } from '@tanstack/react-router'
+import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '@/stores/auth-store'
+import { ROLE } from '@/lib/roles'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionPageLayout } from '@/components/layout'
 import {
   CardStaggerContainer,
@@ -18,6 +21,7 @@ import { DEFAULT_TIME_GRANULARITY } from './constants'
 import {
   type DashboardSectionId,
   DASHBOARD_DEFAULT_SECTION,
+  DASHBOARD_SECTION_IDS,
 } from './section-registry'
 import { type DashboardFilters, type QuotaDataItem } from './types'
 
@@ -32,6 +36,12 @@ const LazyLogStatCards = lazy(() =>
 const LazyModelCharts = lazy(() =>
   import('./components/models/model-charts').then((m) => ({
     default: m.ModelCharts,
+  }))
+)
+
+const LazyConsumptionDistributionChart = lazy(() =>
+  import('./components/models/consumption-distribution-chart').then((m) => ({
+    default: m.ConsumptionDistributionChart,
   }))
 )
 
@@ -80,8 +90,8 @@ const SECTION_META: Record<
     descriptionKey: 'View dashboard overview and statistics',
   },
   models: {
-    titleKey: 'Models',
-    descriptionKey: 'View model statistics and charts',
+    titleKey: 'Model Call Analytics',
+    descriptionKey: 'View model call count analytics and charts',
   },
   users: {
     titleKey: 'User Analytics',
@@ -91,7 +101,9 @@ const SECTION_META: Record<
 
 export function Dashboard() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const params = route.useParams()
+  const userRole = useAuthStore((state) => state.auth.user?.role)
   const activeSection = (params.section ??
     DASHBOARD_DEFAULT_SECTION) as DashboardSectionId
 
@@ -116,6 +128,24 @@ export function Dashboard() {
   )
 
   const meta = SECTION_META[activeSection] ?? SECTION_META.overview
+  const isAdmin = Boolean(userRole && userRole >= ROLE.ADMIN)
+  const visibleSections = useMemo(
+    () =>
+      DASHBOARD_SECTION_IDS.filter(
+        (section) => section !== 'overview' && (section !== 'users' || isAdmin)
+      ),
+    [isAdmin]
+  )
+  const handleSectionChange = useCallback(
+    (section: string) => {
+      void navigate({
+        to: '/dashboard/$section',
+        params: { section: section as DashboardSectionId },
+      })
+    },
+    [navigate]
+  )
+  const showSectionTabs = activeSection !== 'overview' && visibleSections.length > 1
 
   return (
     <SectionPageLayout>
@@ -133,6 +163,17 @@ export function Dashboard() {
       )}
       <SectionPageLayout.Content>
         <div className='space-y-4'>
+          {showSectionTabs && (
+            <Tabs value={activeSection} onValueChange={handleSectionChange}>
+              <TabsList className='h-auto max-w-full flex-wrap justify-start'>
+                {visibleSections.map((section) => (
+                  <TabsTrigger key={section} value={section}>
+                    {t(SECTION_META[section].titleKey)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
           {activeSection === 'overview' && (
             <>
               <SummaryCards />
@@ -163,6 +204,17 @@ export function Dashboard() {
                 </Suspense>
               </FadeIn>
               <FadeIn delay={0.1}>
+                <Suspense fallback={<ModelChartsFallback />}>
+                  <LazyConsumptionDistributionChart
+                    data={modelData}
+                    loading={dataLoading}
+                    timeGranularity={
+                      modelFilters.time_granularity || DEFAULT_TIME_GRANULARITY
+                    }
+                  />
+                </Suspense>
+              </FadeIn>
+              <FadeIn delay={0.15}>
                 <Suspense fallback={<ModelChartsFallback />}>
                   <LazyModelCharts
                     data={modelData}
