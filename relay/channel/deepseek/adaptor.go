@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -28,19 +29,23 @@ func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dt
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.ClaudeRequest) (any, error) {
-	adaptor := claude.Adaptor{}
-	convertedRequest, err := adaptor.ConvertClaudeRequest(c, info, req)
+	if useDeepSeekAnthropicUpstream(info) {
+		if err := applyDeepSeekV4ClaudeThinkingSuffix(info, req); err != nil {
+			return nil, err
+		}
+		return req, nil
+	}
+
+	openAIRequest, err := service.ClaudeToOpenAIRequest(*req, info)
 	if err != nil {
 		return nil, err
 	}
-	claudeRequest, ok := convertedRequest.(*dto.ClaudeRequest)
-	if !ok {
-		return convertedRequest, nil
+	if info.SupportStreamOptions && info.IsStream {
+		openAIRequest.StreamOptions = &dto.StreamOptions{
+			IncludeUsage: true,
+		}
 	}
-	if err := applyDeepSeekV4ClaudeThinkingSuffix(info, claudeRequest); err != nil {
-		return nil, err
-	}
-	return claudeRequest, nil
+	return a.ConvertOpenAIRequest(c, info, openAIRequest)
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
@@ -57,12 +62,17 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	fimBaseUrl := info.ChannelBaseUrl
-	switch info.RelayFormat {
+	baseURL := strings.TrimRight(info.ChannelBaseUrl, "/")
+	switch info.GetFinalRequestRelayFormat() {
 	case types.RelayFormatClaude:
-		return fmt.Sprintf("%s/anthropic/v1/messages", info.ChannelBaseUrl), nil
+		if isDeepSeekAnthropicBaseURL(baseURL) {
+			return fmt.Sprintf("%s/v1/messages", baseURL), nil
+		}
+		return fmt.Sprintf("%s/anthropic/v1/messages", baseURL), nil
 	default:
-		if !strings.HasSuffix(info.ChannelBaseUrl, "/beta") {
+		openAIBaseURL := deepSeekOpenAIBaseURL(baseURL)
+		fimBaseUrl := openAIBaseURL
+		if !strings.HasSuffix(openAIBaseURL, "/beta") {
 			fimBaseUrl += "/beta"
 		}
 		switch info.RelayMode {
@@ -72,6 +82,19 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			return fmt.Sprintf("%s/v1/chat/completions", info.ChannelBaseUrl), nil
 		}
 	}
+}
+
+func useDeepSeekAnthropicUpstream(info *relaycommon.RelayInfo) bool {
+	return info != nil && isDeepSeekAnthropicBaseURL(info.ChannelBaseUrl)
+}
+
+func isDeepSeekAnthropicBaseURL(baseURL string) bool {
+	return strings.HasSuffix(strings.TrimRight(baseURL, "/"), "/anthropic")
+}
+
+func deepSeekOpenAIBaseURL(baseURL string) string {
+	baseURL = strings.TrimRight(baseURL, "/")
+	return strings.TrimSuffix(baseURL, "/anthropic")
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
@@ -168,7 +191,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage any, err *types.NewAPIError) {
-	switch info.RelayFormat {
+	switch info.GetFinalRequestRelayFormat() {
 	case types.RelayFormatClaude:
 		adaptor := claude.Adaptor{}
 		return adaptor.DoResponse(c, resp, info)
