@@ -441,6 +441,13 @@ func (m *Message) GetReasoningContent() string {
 	return *m.Reasoning
 }
 
+func (m *Message) GetReasoningContentPtr() *string {
+	if m.ReasoningContent != nil {
+		return m.ReasoningContent
+	}
+	return m.Reasoning
+}
+
 func (m *Message) GetPrefix() bool {
 	if m.Prefix == nil {
 		return false

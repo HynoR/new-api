@@ -33,7 +33,7 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 	}
 
 	isOpenRouter := info.ChannelType == constant.ChannelTypeOpenRouter
-	isDeepSeekV4 := isDeepSeekV4Relay(info, claudeRequest.Model)
+	isDeepSeek := isDeepSeekChannel(info)
 
 	if isOpenRouter {
 		if effort := claudeRequest.GetEfforts(); effort != "" {
@@ -151,7 +151,7 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 			for _, mediaMsg := range contents {
 				switch mediaMsg.Type {
 				case "thinking":
-					if isDeepSeekV4 && claudeMessage.Role == "assistant" {
+					if isDeepSeek && claudeMessage.Role == "assistant" {
 						appendOpenAIMessageReasoningContent(&openAIMessage, mediaMsg.Thinking)
 					}
 				case "text", "input_text":
@@ -221,39 +221,15 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 	return &openAIRequest, nil
 }
 
-func isDeepSeekV4Relay(info *relaycommon.RelayInfo, modelNames ...string) bool {
-	if info != nil {
-		modelNames = append(modelNames, info.OriginModelName)
-		if info.ChannelMeta != nil {
-			modelNames = append(modelNames, info.UpstreamModelName)
-		}
-	}
-	for _, modelName := range modelNames {
-		if strings.HasPrefix(modelName, "deepseek-v4-") {
-			return true
-		}
-	}
-	return false
+func isDeepSeekChannel(info *relaycommon.RelayInfo) bool {
+	return info != nil && info.ChannelMeta != nil && info.ChannelType == constant.ChannelTypeDeepSeek
 }
 
 func appendOpenAIMessageReasoningContent(message *dto.Message, thinking *string) {
 	if message == nil || thinking == nil {
 		return
 	}
-	if message.ReasoningContent == nil {
-		value := *thinking
-		message.ReasoningContent = &value
-		return
-	}
-	value := *message.ReasoningContent + *thinking
-	message.ReasoningContent = &value
-}
-
-func getOpenAIMessageReasoningContent(message dto.Message) *string {
-	if message.ReasoningContent != nil {
-		return message.ReasoningContent
-	}
-	return message.Reasoning
+	message.ReasoningContent = lo.ToPtr(lo.FromPtr(message.ReasoningContent) + *thinking)
 }
 
 func generateStopBlock(index int) *dto.ClaudeResponse {
@@ -653,14 +629,17 @@ func ResponseOpenAI2Claude(openAIResponse *dto.OpenAITextResponse, info *relayco
 		Role:  "assistant",
 		Model: openAIResponse.Model,
 	}
+	isDeepSeek := isDeepSeekChannel(info)
 	for _, choice := range openAIResponse.Choices {
 		stopReason = stopReasonOpenAI2Claude(choice.FinishReason)
-		if reasoningContent := getOpenAIMessageReasoningContent(choice.Message); reasoningContent != nil && isDeepSeekV4Relay(info, openAIResponse.Model) {
-			reasoning := *reasoningContent
-			contents = append(contents, dto.ClaudeMediaMessage{
-				Type:     "thinking",
-				Thinking: &reasoning,
-			})
+		if isDeepSeek {
+			if reasoningContent := choice.Message.GetReasoningContentPtr(); reasoningContent != nil {
+				reasoning := *reasoningContent
+				contents = append(contents, dto.ClaudeMediaMessage{
+					Type:     "thinking",
+					Thinking: &reasoning,
+				})
+			}
 		}
 		if choice.FinishReason == "tool_calls" {
 			for _, toolUse := range choice.Message.ParseToolCalls() {
