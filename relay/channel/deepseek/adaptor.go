@@ -40,6 +40,9 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, err
 	}
+	if err := preserveDeepSeekClaudeThinking(req, openAIRequest); err != nil {
+		return nil, err
+	}
 	if info.SupportStreamOptions && info.IsStream {
 		openAIRequest.StreamOptions = &dto.StreamOptions{
 			IncludeUsage: true,
@@ -79,7 +82,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		case constant.RelayModeCompletions:
 			return fmt.Sprintf("%s/completions", fimBaseUrl), nil
 		default:
-			return fmt.Sprintf("%s/v1/chat/completions", info.ChannelBaseUrl), nil
+			return fmt.Sprintf("%s/v1/chat/completions", openAIBaseURL), nil
 		}
 	}
 }
@@ -95,6 +98,72 @@ func isDeepSeekAnthropicBaseURL(baseURL string) bool {
 func deepSeekOpenAIBaseURL(baseURL string) string {
 	baseURL = strings.TrimRight(baseURL, "/")
 	return strings.TrimSuffix(baseURL, "/anthropic")
+}
+
+func preserveDeepSeekClaudeThinking(claudeRequest *dto.ClaudeRequest, openAIRequest *dto.GeneralOpenAIRequest) error {
+	if claudeRequest == nil || openAIRequest == nil {
+		return nil
+	}
+
+	assistantThinking := make([]*string, 0)
+	for _, claudeMessage := range claudeRequest.Messages {
+		if claudeMessage.Role != "assistant" {
+			continue
+		}
+
+		var thinking *string
+		if !claudeMessage.IsStringContent() {
+			contents, err := claudeMessage.ParseContent()
+			if err != nil {
+				return err
+			}
+			for _, mediaMessage := range contents {
+				if mediaMessage.Type == "thinking" {
+					thinking = appendDeepSeekThinking(thinking, mediaMessage.Thinking)
+				}
+			}
+		}
+		assistantThinking = append(assistantThinking, thinking)
+	}
+
+	assistantIndex := 0
+	for i := range openAIRequest.Messages {
+		if openAIRequest.Messages[i].Role != "assistant" {
+			continue
+		}
+		if assistantIndex >= len(assistantThinking) {
+			break
+		}
+		if assistantThinking[assistantIndex] != nil {
+			appendDeepSeekOpenAIReasoningContent(&openAIRequest.Messages[i], assistantThinking[assistantIndex])
+		}
+		assistantIndex++
+	}
+	return nil
+}
+
+func appendDeepSeekThinking(current *string, next *string) *string {
+	if next == nil {
+		return current
+	}
+	combined := ""
+	if current != nil {
+		combined = *current
+	}
+	combined += *next
+	return &combined
+}
+
+func appendDeepSeekOpenAIReasoningContent(message *dto.Message, thinking *string) {
+	if message == nil || thinking == nil {
+		return
+	}
+	combined := ""
+	if message.ReasoningContent != nil {
+		combined = *message.ReasoningContent
+	}
+	combined += *thinking
+	message.ReasoningContent = &combined
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
