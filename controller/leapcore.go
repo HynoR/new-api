@@ -188,10 +188,13 @@ func normalizeLeapcoreMachineInput(raw string) (string, error) {
 		return normalizeLeapcoreMachineID(input)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(input)
-	if err != nil {
-		return "", fmt.Errorf("machine_id must be plain machine_id or base64(machine_id)")
+	if err == nil {
+		decodedInput := strings.TrimSpace(string(decoded))
+		if strings.HasPrefix(decodedInput, leapcoreMachineIDPrefix) {
+			return normalizeLeapcoreMachineID(decodedInput)
+		}
 	}
-	return normalizeLeapcoreMachineID(string(decoded))
+	return normalizeLeapcoreMachineID(leapcoreMachineIDPrefix + base64.StdEncoding.EncodeToString([]byte(input)))
 }
 
 func normalizeLeapcoreMachineID(raw string) (string, error) {

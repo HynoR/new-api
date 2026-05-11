@@ -77,7 +77,7 @@ export async function createUser(
 }
 
 /**
- * Provision a LeapCore machine user from a machine_id or base64(machine_id).
+ * Provision a LeapCore machine user from a fingerprint, machine_id, or base64(machine_id).
  */
 export async function createLeapCoreMachineUser(
   data: LeapCoreMachineUserPayload

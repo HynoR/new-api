@@ -535,6 +535,26 @@ func TestCreateLeapCoreMachineUserAcceptsBase64MachineID(t *testing.T) {
 	}
 }
 
+func TestCreateLeapCoreMachineUserAcceptsRawFingerprint(t *testing.T) {
+	rawFingerprint := "4c4c45444d0032108058c4c04f4d5332/CN1296378H00AB"
+	machineID := leapcoreMachineID(rawFingerprint)
+	setupLeapcoreControllerTestDB(t)
+
+	ctx, recorder := newLeapcoreMachineUserContext(t, rawFingerprint)
+	CreateLeapCoreMachineUser(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d with body %s", recorder.Code, recorder.Body.String())
+	}
+	data := decodeLeapcoreMachineUserResponse(t, recorder)
+	if data.MachineID != machineID {
+		t.Fatalf("expected normalized machine_id %q, got %q", machineID, data.MachineID)
+	}
+	if data.Username != deriveLeapcoreUsername(machineID) || data.Password != deriveLeapcorePassword(machineID) {
+		t.Fatalf("unexpected derived credentials: %#v", data)
+	}
+}
+
 func TestCreateLeapCoreMachineUserIsIdempotent(t *testing.T) {
 	db := setupLeapcoreControllerTestDB(t)
 	machineID := leapcoreMachineID("idempotent-provision-machine")
