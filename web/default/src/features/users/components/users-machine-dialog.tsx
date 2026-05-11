@@ -114,7 +114,9 @@ export function UsersMachineDialog({
               id='leapcore-machine-id'
               value={machineID}
               onChange={(event) => setMachineID(event.target.value)}
-              placeholder={t('Enter machine_id or base64(machine_id)')}
+              placeholder={t(
+                'Enter fingerprint, machine_id, or base64(machine_id)'
+              )}
               rows={4}
             />
           </div>
