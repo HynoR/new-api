@@ -21,6 +21,7 @@ import { createSectionRegistry } from '../utils/section-registry'
 import { BasicAuthSection } from './basic-auth-section'
 import { BotProtectionSection } from './bot-protection-section'
 import { CustomOAuthSection } from './custom-oauth/custom-oauth-section'
+import { LeapCoreSection } from './leapcore-section'
 import { OAuthSection } from './oauth-section'
 import { PasskeySection } from './passkey-section'
 
@@ -75,6 +76,18 @@ const AUTH_SECTIONS = [
           WeChatServerAddress: settings.WeChatServerAddress,
           WeChatServerToken: settings.WeChatServerToken,
           WeChatAccountQRCodeImageURL: settings.WeChatAccountQRCodeImageURL,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'leapcore',
+    titleKey: 'LeapCore',
+    descriptionKey: 'Configure LeapCore machine registration',
+    build: (settings: AuthSettings) => (
+      <LeapCoreSection
+        defaultValues={{
+          LeapCoreHelperKey: settings.LeapCoreHelperKey,
         }}
       />
     ),

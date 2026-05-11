@@ -25,6 +25,8 @@ import type {
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
+  LeapCoreMachineUser,
+  LeapCoreMachineUserPayload,
   ApiResponse,
 } from './types'
 
@@ -71,6 +73,16 @@ export async function createUser(
   data: UserFormData
 ): Promise<ApiResponse<User>> {
   const res = await api.post('/api/user/', data)
+  return res.data
+}
+
+/**
+ * Provision a LeapCore machine user from a machine_id or base64(machine_id).
+ */
+export async function createLeapCoreMachineUser(
+  data: LeapCoreMachineUserPayload
+): Promise<ApiResponse<LeapCoreMachineUser>> {
+  const res = await api.post('/api/user/leapcore/machine', data)
   return res.data
 }
 

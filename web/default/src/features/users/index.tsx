@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 import { SectionPageLayout } from '@/components/layout'
 import { UsersDeleteDialog } from './components/users-delete-dialog'
+import { UsersMachineDialog } from './components/users-machine-dialog'
 import { UsersMutateDrawer } from './components/users-mutate-drawer'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider, useUsers } from './components/users-provider'
@@ -47,6 +48,10 @@ function UsersContent() {
         open={open === 'create' || open === 'update'}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         currentRow={open === 'update' ? currentRow || undefined : undefined}
+      />
+      <UsersMachineDialog
+        open={open === 'machine'}
+        onOpenChange={(isOpen) => !isOpen && setOpen(null)}
       />
       <UsersDeleteDialog />
     </>

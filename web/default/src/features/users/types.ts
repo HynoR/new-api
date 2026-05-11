@@ -106,6 +106,18 @@ export interface UserFormData {
   remark?: string // Only used when updating user
 }
 
+export interface LeapCoreMachineUserPayload {
+  machine_id: string
+}
+
+export interface LeapCoreMachineUser {
+  id: number
+  username: string
+  machine_id: string
+  password: string
+  created: boolean
+}
+
 export type ManageUserAction =
   | 'promote'
   | 'demote'
@@ -127,4 +139,4 @@ export interface ManageUserQuotaPayload {
 // Dialog Types
 // ============================================================================
 
-export type UsersDialogType = 'create' | 'update' | 'delete'
+export type UsersDialogType = 'create' | 'update' | 'delete' | 'machine'
