@@ -40,12 +40,8 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	case *dto.OpenAIResponsesRequest:
 		responsesReq = req
 	case *dto.OpenAIResponsesCompactionRequest:
-		responsesReq = &dto.OpenAIResponsesRequest{
-			Model:              req.Model,
-			Input:              req.Input,
-			Instructions:       req.Instructions,
-			PreviousResponseID: req.PreviousResponseID,
-		}
+		converted := req.ToResponsesRequest()
+		responsesReq = &converted
 	default:
 		return types.NewErrorWithStatusCode(
 			fmt.Errorf("invalid request type, expected dto.OpenAIResponsesRequest or dto.OpenAIResponsesCompactionRequest, got %T", info.Request),
