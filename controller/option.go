@@ -99,6 +99,10 @@ func GetOptions(c *gin.Context) {
 		Key:   "CompletionRatioMeta",
 		Value: buildCompletionRatioMetaValue(optionValues),
 	})
+	options = append(options, &model.Option{
+		Key:   "LeapCoreHelperKeyConfigured",
+		Value: common.Interface2String(strings.TrimSpace(common.LeapCoreHelperKey) != ""),
+	})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

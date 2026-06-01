@@ -59,6 +59,7 @@ const defaultAuthSettings: AuthSettings = {
   TurnstileSiteKey: '',
   TurnstileSecretKey: '',
   LeapCoreHelperKey: '',
+  LeapCoreHelperKeyConfigured: false,
   'passkey.enabled': false,
   'passkey.rp_display_name': '',
   'passkey.rp_id': '',

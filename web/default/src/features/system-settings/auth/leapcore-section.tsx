@@ -21,6 +21,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -37,6 +38,7 @@ import { useUpdateOption } from '../hooks/use-update-option'
 
 const leapcoreSchema = z.object({
   LeapCoreHelperKey: z.string().optional(),
+  LeapCoreHelperKeyConfigured: z.boolean().optional(),
 })
 
 type LeapCoreFormValues = z.infer<typeof leapcoreSchema>
@@ -53,6 +55,8 @@ export function LeapCoreSection({ defaultValues }: LeapCoreSectionProps) {
     resolver: zodResolver(leapcoreSchema),
     defaultValues: {
       LeapCoreHelperKey: defaultValues.LeapCoreHelperKey ?? '',
+      LeapCoreHelperKeyConfigured:
+        defaultValues.LeapCoreHelperKeyConfigured ?? false,
     },
   })
 
@@ -70,6 +74,8 @@ export function LeapCoreSection({ defaultValues }: LeapCoreSectionProps) {
     form.reset({ LeapCoreHelperKey: '' })
   }
 
+  const isConfigured = defaultValues.LeapCoreHelperKeyConfigured ?? false
+
   return (
     <SettingsSection
       title={t('LeapCore')}
@@ -86,7 +92,16 @@ export function LeapCoreSection({ defaultValues }: LeapCoreSectionProps) {
             name='LeapCoreHelperKey'
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t('Helper Key')}</FormLabel>
+                <div className='flex items-center gap-2'>
+                  <FormLabel>{t('Helper Key')}</FormLabel>
+                  {isConfigured ? (
+                    <Badge className='bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'>
+                      {t('Configured')}
+                    </Badge>
+                  ) : (
+                    <Badge variant='secondary'>{t('Not configured')}</Badge>
+                  )}
+                </div>
                 <FormControl>
                   <Input
                     type='password'
@@ -98,6 +113,11 @@ export function LeapCoreSection({ defaultValues }: LeapCoreSectionProps) {
                 <FormDescription>
                   {t(
                     'Used to validate X-Helper-Key on LeapCore machine registration requests.'
+                  )}
+                </FormDescription>
+                <FormDescription>
+                  {t(
+                    'Leave empty to keep existing key. New value will overwrite the previous one.'
                   )}
                 </FormDescription>
                 <FormMessage />

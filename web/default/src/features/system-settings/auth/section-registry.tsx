@@ -88,6 +88,7 @@ const AUTH_SECTIONS = [
       <LeapCoreSection
         defaultValues={{
           LeapCoreHelperKey: settings.LeapCoreHelperKey,
+          LeapCoreHelperKeyConfigured: settings.LeapCoreHelperKeyConfigured,
         }}
       />
     ),

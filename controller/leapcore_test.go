@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -127,6 +128,42 @@ func newLeapcoreMachineUserContext(t *testing.T, machineID string) (*gin.Context
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/user/leapcore/machine", bytes.NewReader(body))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	return ctx, recorder
+}
+
+func setLeapcoreAdminCaller(ctx *gin.Context, id int, username string) {
+	ctx.Set("id", id)
+	ctx.Set("username", username)
+}
+
+func assertLeapcoreAuditLog(t *testing.T, userID int, contentSubstr string, adminUsername string) {
+	t.Helper()
+
+	var logs []model.Log
+	if err := model.LOG_DB.Where("user_id = ? AND type = ?", userID, model.LogTypeManage).
+		Order("id desc").Find(&logs).Error; err != nil {
+		t.Fatalf("failed to query audit logs: %v", err)
+	}
+	for _, l := range logs {
+		if !strings.Contains(l.Content, contentSubstr) {
+			continue
+		}
+		if l.Other == "" {
+			t.Fatalf("expected audit log Other to contain admin_info, got empty: %#v", l)
+		}
+		other, err := common.StrToMap(l.Other)
+		if err != nil {
+			t.Fatalf("failed to parse audit log Other %q: %v", l.Other, err)
+		}
+		adminInfo, ok := other["admin_info"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected audit log admin_info map, got %#v", other["admin_info"])
+		}
+		if got := fmt.Sprint(adminInfo["admin_username"]); got != adminUsername {
+			t.Fatalf("expected admin_username %q in audit log, got %q", adminUsername, got)
+		}
+		return
+	}
+	t.Fatalf("expected audit log containing %q for user %d, found %d logs", contentSubstr, userID, len(logs))
 }
 
 func decodeLeapcoreAPIResponse(t *testing.T, recorder *httptest.ResponseRecorder) tokenAPIResponse {
@@ -480,6 +517,7 @@ func TestCreateLeapCoreMachineUserCreatesProvisionedUser(t *testing.T) {
 	machineID := leapcoreMachineID("provision-machine")
 
 	ctx, recorder := newLeapcoreMachineUserContext(t, machineID)
+	setLeapcoreAdminCaller(ctx, 42, "root-admin")
 	CreateLeapCoreMachineUser(ctx)
 
 	if recorder.Code != http.StatusOK {
@@ -509,6 +547,10 @@ func TestCreateLeapCoreMachineUserCreatesProvisionedUser(t *testing.T) {
 	if user.Role != common.RoleCommonUser || user.Status != common.UserStatusEnabled {
 		t.Fatalf("created machine user has unexpected role/status: %#v", user)
 	}
+	if data.DisplayName != user.DisplayName {
+		t.Fatalf("expected response display_name %q, got %q", user.DisplayName, data.DisplayName)
+	}
+	assertLeapcoreAuditLog(t, user.Id, "管理员预置 LeapCore 机器用户", "root-admin")
 	if common.ValidatePasswordAndHash(data.Password, user.Password) {
 		return
 	}
@@ -560,10 +602,12 @@ func TestCreateLeapCoreMachineUserIsIdempotent(t *testing.T) {
 	machineID := leapcoreMachineID("idempotent-provision-machine")
 
 	ctx, recorder := newLeapcoreMachineUserContext(t, machineID)
+	setLeapcoreAdminCaller(ctx, 7, "admin-one")
 	CreateLeapCoreMachineUser(ctx)
 	first := decodeLeapcoreMachineUserResponse(t, recorder)
 
 	ctx, recorder = newLeapcoreMachineUserContext(t, machineID)
+	setLeapcoreAdminCaller(ctx, 8, "admin-two")
 	CreateLeapCoreMachineUser(ctx)
 	second := decodeLeapcoreMachineUserResponse(t, recorder)
 
@@ -581,6 +625,9 @@ func TestCreateLeapCoreMachineUserIsIdempotent(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected one machine user, got %d", count)
 	}
+
+	assertLeapcoreAuditLog(t, first.ID, "管理员预置 LeapCore 机器用户", "admin-one")
+	assertLeapcoreAuditLog(t, first.ID, "管理员复用 LeapCore 机器用户", "admin-two")
 }
 
 func TestCreateLeapCoreMachineUserRejectsRemarkConflict(t *testing.T) {

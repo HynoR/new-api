@@ -116,6 +116,8 @@ export interface LeapCoreMachineUser {
   machine_id: string
   password: string
   created: boolean
+  display_name?: string
+  group?: string
 }
 
 export type ManageUserAction =

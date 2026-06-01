@@ -96,6 +96,7 @@ export type AuthSettings = {
   TurnstileSiteKey: string
   TurnstileSecretKey: string
   LeapCoreHelperKey: string
+  LeapCoreHelperKeyConfigured: boolean
   'passkey.enabled': boolean
   'passkey.rp_display_name': string
   'passkey.rp_id': string

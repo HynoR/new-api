@@ -35,11 +35,13 @@ type leapcoreMachineUserRequest struct {
 }
 
 type leapcoreMachineUserResponse struct {
-	ID        int    `json:"id"`
-	Username  string `json:"username"`
-	MachineID string `json:"machine_id"`
-	Password  string `json:"password"`
-	Created   bool   `json:"created"`
+	ID          int    `json:"id"`
+	Username    string `json:"username"`
+	MachineID   string `json:"machine_id"`
+	Password    string `json:"password"`
+	Created     bool   `json:"created"`
+	DisplayName string `json:"display_name,omitempty"`
+	Group       string `json:"group,omitempty"`
 }
 
 func LeapCoreRegister(c *gin.Context) {
@@ -115,6 +117,7 @@ func CreateLeapCoreMachineUser(c *gin.Context) {
 
 	username := deriveLeapcoreUsername(machineID)
 	password := deriveLeapcorePassword(machineID)
+	adminInfo := buildLeapcoreAdminInfo(c)
 
 	var existing model.User
 	err = model.DB.Unscoped().Where("username = ?", username).First(&existing).Error
@@ -127,12 +130,17 @@ func CreateLeapCoreMachineUser(c *gin.Context) {
 			common.ApiErrorMsg(c, "machine user already exists with a different remark")
 			return
 		}
+		model.RecordLogWithAdminInfo(existing.Id, model.LogTypeManage,
+			fmt.Sprintf("管理员复用 LeapCore 机器用户 (machine_id=%s)", truncateLeapcoreMachineID(machineID)),
+			adminInfo)
 		common.ApiSuccess(c, leapcoreMachineUserResponse{
-			ID:        existing.Id,
-			Username:  existing.Username,
-			MachineID: machineID,
-			Password:  password,
-			Created:   false,
+			ID:          existing.Id,
+			Username:    existing.Username,
+			MachineID:   machineID,
+			Password:    password,
+			Created:     false,
+			DisplayName: existing.DisplayName,
+			Group:       existing.Group,
 		})
 		return
 	}
@@ -155,13 +163,34 @@ func CreateLeapCoreMachineUser(c *gin.Context) {
 		return
 	}
 
+	model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
+		fmt.Sprintf("管理员预置 LeapCore 机器用户 (machine_id=%s)", truncateLeapcoreMachineID(machineID)),
+		adminInfo)
+
 	common.ApiSuccess(c, leapcoreMachineUserResponse{
-		ID:        user.Id,
-		Username:  user.Username,
-		MachineID: machineID,
-		Password:  password,
-		Created:   true,
+		ID:          user.Id,
+		Username:    user.Username,
+		MachineID:   machineID,
+		Password:    password,
+		Created:     true,
+		DisplayName: user.DisplayName,
+		Group:       user.Group,
 	})
+}
+
+func buildLeapcoreAdminInfo(c *gin.Context) map[string]interface{} {
+	return map[string]interface{}{
+		"admin_id":       c.GetInt("id"),
+		"admin_username": c.GetString("username"),
+	}
+}
+
+func truncateLeapcoreMachineID(machineID string) string {
+	const maxLen = 32
+	if len(machineID) <= maxLen {
+		return machineID
+	}
+	return machineID[:maxLen] + "..."
 }
 
 func validateLeapcoreHelperKey(provided string) bool {

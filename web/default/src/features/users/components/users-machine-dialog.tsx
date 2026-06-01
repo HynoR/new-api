@@ -16,10 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type FormEvent, useState } from 'react'
-import { Cpu } from 'lucide-react'
+import { type FormEvent, useRef, useState } from 'react'
+import { Check, Copy, Cpu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,6 +34,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { createLeapCoreMachineUser } from '../api'
 import { ERROR_MESSAGES } from '../constants'
 import { type LeapCoreMachineUser } from '../types'
@@ -40,6 +43,27 @@ import { useUsers } from './users-provider'
 type UsersMachineDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+function CopyButton({ value }: { value: string }) {
+  const { t } = useTranslation()
+  const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
+  return (
+    <Button
+      type='button'
+      variant='ghost'
+      size='sm'
+      className='h-8 w-8 shrink-0 p-0'
+      onClick={() => copyToClipboard(value)}
+      title={t('Copy to clipboard')}
+    >
+      {copiedText === value ? (
+        <Check className='size-4 text-green-600' />
+      ) : (
+        <Copy className='size-4' />
+      )}
+    </Button>
+  )
 }
 
 export function UsersMachineDialog({
@@ -51,6 +75,7 @@ export function UsersMachineDialog({
   const [machineID, setMachineID] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<LeapCoreMachineUser | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen)
@@ -69,6 +94,7 @@ export function UsersMachineDialog({
       return
     }
 
+    setResult(null)
     setIsSubmitting(true)
     try {
       const response = await createLeapCoreMachineUser({ machine_id: input })
@@ -88,6 +114,12 @@ export function UsersMachineDialog({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleProvisionAnother = () => {
+    setMachineID('')
+    setResult(null)
+    setTimeout(() => textareaRef.current?.focus(), 0)
   }
 
   return (
@@ -111,6 +143,7 @@ export function UsersMachineDialog({
           <div className='space-y-2'>
             <Label htmlFor='leapcore-machine-id'>{t('Machine Code')}</Label>
             <Textarea
+              ref={textareaRef}
               id='leapcore-machine-id'
               value={machineID}
               onChange={(event) => setMachineID(event.target.value)}
@@ -118,38 +151,76 @@ export function UsersMachineDialog({
                 'Enter fingerprint, machine_id, or base64(machine_id)'
               )}
               rows={4}
+              disabled={isSubmitting}
             />
           </div>
 
           {result && (
             <div className='space-y-3 rounded-md border p-3'>
+              <div className='flex items-center gap-2'>
+                {result.created ? (
+                  <Badge className='bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'>
+                    {t('Newly created')}
+                  </Badge>
+                ) : (
+                  <Badge variant='secondary'>{t('Already exists')}</Badge>
+                )}
+              </div>
+
+              <Alert>
+                <AlertDescription>
+                  {t(
+                    'This initial password is shown only once. Save it before closing this dialog.'
+                  )}
+                </AlertDescription>
+              </Alert>
+
               <div className='space-y-1.5'>
                 <Label htmlFor='leapcore-machine-username'>
                   {t('Username')}
                 </Label>
-                <Input
-                  id='leapcore-machine-username'
-                  value={result.username}
-                  readOnly
-                />
+                <div className='flex items-center gap-1'>
+                  <Input
+                    id='leapcore-machine-username'
+                    value={result.username}
+                    readOnly
+                    className='flex-1'
+                  />
+                  <CopyButton value={result.username} />
+                </div>
+                {(result.display_name || result.group) && (
+                  <p className='text-muted-foreground text-xs'>
+                    {[result.display_name, result.group]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                )}
               </div>
               <div className='space-y-1.5'>
                 <Label htmlFor='leapcore-machine-password'>
                   {t('Initial Password')}
                 </Label>
-                <Input
-                  id='leapcore-machine-password'
-                  value={result.password}
-                  readOnly
-                />
+                <div className='flex items-center gap-1'>
+                  <Input
+                    id='leapcore-machine-password'
+                    value={result.password}
+                    readOnly
+                    className='flex-1'
+                  />
+                  <CopyButton value={result.password} />
+                </div>
               </div>
               <div className='space-y-1.5'>
                 <Label htmlFor='leapcore-machine-remark'>{t('Remark')}</Label>
-                <Input
-                  id='leapcore-machine-remark'
-                  value={result.machine_id}
-                  readOnly
-                />
+                <div className='flex items-center gap-1'>
+                  <Input
+                    id='leapcore-machine-remark'
+                    value={result.machine_id}
+                    readOnly
+                    className='flex-1'
+                  />
+                  <CopyButton value={result.machine_id} />
+                </div>
               </div>
             </div>
           )}
@@ -163,13 +234,23 @@ export function UsersMachineDialog({
           >
             {t('Close')}
           </Button>
-          <Button
-            form='leapcore-machine-form'
-            type='submit'
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? t('Saving...') : t('Create')}
-          </Button>
+          {result ? (
+            <Button
+              type='button'
+              variant='secondary'
+              onClick={handleProvisionAnother}
+            >
+              {t('Provision Another')}
+            </Button>
+          ) : (
+            <Button
+              form='leapcore-machine-form'
+              type='submit'
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? t('Saving...') : t('Create')}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
